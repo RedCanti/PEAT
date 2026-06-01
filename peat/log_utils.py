@@ -408,25 +408,32 @@ def setup_logging(
             scapy_level = logging.DEBUG
         logging.getLogger(name).setLevel(scapy_level)
 
-    # Configure logging to Elasticsearch
+    # Configure the elasticsearch.log file handler if any Elastic-derived
+    # target is configured (generic Elastic/OpenSearch via ELASTIC_SERVER,
+    # Malcolm via MALCOLM_SERVER, or Security Onion via SO_SERVER). Without
+    # this handler, messages tagged with ``es_logger=True`` would be filtered
+    # out of peat.log + json-log.jsonl and dropped entirely.
+    if (config.ELASTIC_SERVER or config.MALCOLM_SERVER or config.SO_SERVER) and config.LOG_DIR:
+        es_lp = config.LOG_DIR / "elasticsearch.log"
+        logger.add(
+            sink=es_lp,
+            level=log_level,
+            format=file_formatter,
+            colorize=False,
+            backtrace=True,
+            catch=True,
+            enqueue=True,  # multiprocessing
+            filter=lambda r: bool(r["extra"].get("es_logger")),
+        )
+        state.written_files.add(es_lp.as_posix())
+
+    # Configure live logging to the Elasticsearch sink. Only applies to the
+    # generic Elastic target (state.elastic) — Malcolm/SO have their own
+    # transport paths that don't use ElasticLogSink.
     if config.ELASTIC_SERVER and config.ELASTIC_SAVE_LOGS:
         # TODO: add as handler for:
         #   logging.getLogger("elasticsearch"),
         #   logging.getLogger("urllib3"),
-        if config.LOG_DIR:
-            es_lp = config.LOG_DIR / "elasticsearch.log"
-            logger.add(
-                sink=es_lp,
-                level=log_level,
-                format=file_formatter,
-                colorize=False,
-                backtrace=True,
-                catch=True,
-                enqueue=True,  # multiprocessing
-                filter=lambda r: bool(r["extra"].get("es_logger")),
-            )
-            state.written_files.add(es_lp.as_posix())
-
         es_handler = ElasticLogSink(
             server_url=config.ELASTIC_SERVER,
             index=config.ELASTIC_LOG_INDEX,

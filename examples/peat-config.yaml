@@ -316,6 +316,42 @@ elastic_uefi_hashes_index: "uefi-hashes"
 
 # -----------------------------------------------------------------------------
 
+# --- SIEM integrations (Malcolm, Security Onion) ---
+# See: https://sandialabs.github.io/PEAT/integrations.html
+
+# Malcolm OpenSearch URL. The "/mapi/opensearch" path is auto-appended if
+# missing. May contain user:password@ for basic auth.
+# Example: "https://user:pass@malcolm.example.com/"
+malcolm_server: null
+
+# Security Onion Elasticsearch URL. Documents are pushed straight to this
+# Elasticsearch API. Example: "https://so-manager.example.com:9200/"
+so_server: null
+
+# Auth mode for Security Onion: "none", "basic", "apikey", or "cert".
+# "basic" uses user:pass@ in so_server; "apikey" uses so_api_key;
+# "cert" uses so_client_cert and so_client_key.
+so_auth: "basic"
+
+# API key for so_auth="apikey", formatted as "id:api_key".
+so_api_key: null
+
+# Client certificate / key paths for so_auth="cert" (mTLS).
+so_client_cert: null
+so_client_key: null
+
+# CA bundle path for verifying the Security Onion TLS certificate.
+so_ca_cert: null
+
+# Disable TLS verification for Security Onion (use only in lab environments).
+so_insecure: false
+
+# Prefix for event.dataset values pushed to Security Onion
+# (e.g. "peat.configs", "peat.events"). Default is "peat".
+so_dataset_prefix: "peat"
+
+# -----------------------------------------------------------------------------
+
 # --- HEAT (High-fidelity Extraction of Artifacts from Traffic) ---
 # Refer to the HEAT section in the PEAT documentation for details.
 # https://sandialabs.github.io/PEAT/operate.html

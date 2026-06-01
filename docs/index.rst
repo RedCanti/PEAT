@@ -26,6 +26,7 @@ Table of Contents
    install
    configure
    operate
+   integrations
    reference_documents
    design_documents
    developer_reference

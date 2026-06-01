@@ -192,6 +192,13 @@ celerybeat-schedule
 # dotenv
 .env
 
+# SIEM credentials config (see examples/peat-credentials.example.yaml)
+# Never commit real credentials; only the *.example.yaml template is tracked.
+peat-credentials.yaml
+peat-credentials.yml
+.peat-credentials.yaml
+.peat-credentials.yml
+
 # Spyder project settings
 .spyderproject
 

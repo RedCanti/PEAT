@@ -111,3 +111,4 @@ from .api.push_api import push
 from .api.heat_api import heat_main
 from .api.config_builder_api import generate_simple_config, generate_full_config
 from .api.crypto_api import encrypt, decrypt
+from .api.forward_api import forward

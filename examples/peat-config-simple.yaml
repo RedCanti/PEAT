@@ -71,6 +71,17 @@ elastic_memory_index: "ot-device-memory"
 elastic_uefi_hashes_index: "uefi-hashes"
 elastic_uefi_files_index: "uefi-files"
 
+malcolm_server: null
+
+so_server: null
+so_auth: "basic"
+so_api_key: null
+so_client_cert: null
+so_client_key: null
+so_ca_cert: null
+so_insecure: false
+so_dataset_prefix: "peat"
+
 heat_elastic_server: null
 heat_index_names: "packetbeat-*"
 heat_date_range: null

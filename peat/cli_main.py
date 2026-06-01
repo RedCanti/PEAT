@@ -18,6 +18,7 @@ from peat import (
     decrypt,
     encrypt,
     exit_handler,
+    forward,
     heat_main,
     initialize_peat,
     log,
@@ -182,6 +183,13 @@ def oneshot_main(args: dict[str, Any]) -> bool:
 
     if args["func"] == "heat":
         return heat_main()
+
+    if args["func"] == "forward":
+        try:
+            return forward(run_dir=args["run_dir"], target=args["target"])
+        except PeatError as ex:
+            log.error(f"forward failed: {ex}")
+            return False
 
     if args["func"] == "encrypt":
         result = encrypt(args["filepath"], args["user-password"])

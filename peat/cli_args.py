@@ -9,6 +9,8 @@ import sys
 
 from pathvalidate.argparse import validate_filepath_arg
 
+from peat.integrations import target_names
+
 help_str = """
 To get help for a command, run "peat <command> --help" (example: "peat scan --help").
 
@@ -404,6 +406,23 @@ peat heat -e -c peat-config.yaml
 """  # End HEAT examples
 
 
+forward_examples = """
+# Replay an already-collected PEAT run into a Security Onion deployment.
+# Documents are pushed straight to Security Onion's Elasticsearch API.
+peat forward ./peat_results/pull_default-config_2026-05-28_165532013980 \\
+    --target security_onion --so-server https://so-manager:9200 \\
+    --so-api-key id:secret --so-ca-cert /etc/so/ca.pem
+
+# Forward to Malcolm (auto-prepends /mapi/opensearch if missing).
+peat forward ./peat_results/<run-dir> --target malcolm \\
+    --malcolm-server https://user:pass@malcolm.example.com/
+
+# Generic Elastic/OpenSearch target.
+peat forward ./peat_results/<run-dir> --target elastic \\
+    -e https://user:pass@localhost:9200/
+"""  # End forward examples
+
+
 ALL_EXAMPLES: dict[str, str] = {
     "scan": scan_examples,
     "pull": pull_examples,
@@ -411,6 +430,7 @@ ALL_EXAMPLES: dict[str, str] = {
     "push": push_examples,
     "pillage": pillage_examples,
     "heat": heat_examples,
+    "forward": forward_examples,
 }
 
 
@@ -498,6 +518,21 @@ def build_argument_parser(version: str = "0.0.0") -> argparse.ArgumentParser:
         description=heat_description,
     )
     heat_parser.set_defaults(func="heat")
+
+    # Forward command - replay a saved PEAT run into a SIEM target
+    forward_description = (
+        "Forward a previously-collected PEAT run into a SIEM target "
+        "(Elasticsearch, Malcolm, or Security Onion). Reads documents from "
+        "the run's elastic_data/ directory and pushes them to the target "
+        "without re-collecting from devices. Useful for moving PEAT data "
+        "from an isolated collection segment into an analyst environment."
+    )
+    forward_parser = subparsers.add_parser(
+        name="forward",
+        help=forward_description,
+        description=forward_description,
+    )
+    forward_parser.set_defaults(func="forward")
 
     # Config-Builder command
     config_builder_description = (
@@ -697,6 +732,24 @@ def build_argument_parser(version: str = "0.0.0") -> argparse.ArgumentParser:
             "http://user:password@hostname-or-ip:9200/",
         )
         elastic_group.add_argument(
+            "--elastic-user",
+            type=str,
+            metavar="USER",
+            default=None,
+            help="Username for Elasticsearch/OpenSearch basic auth. Injected into "
+            "the server URL so credentials need not be embedded in '-e'. Prefer "
+            "setting this (and the password) via a config file or PEAT_ env var.",
+        )
+        elastic_group.add_argument(
+            "--elastic-password",
+            type=str,
+            metavar="PASSWORD",
+            default=None,
+            help="Password for Elasticsearch/OpenSearch basic auth (with "
+            "--elastic-user). Prefer PEAT_ELASTIC_PASSWORD or a config file over "
+            "passing this on the command line.",
+        )
+        elastic_group.add_argument(
             "--elastic-timeout",
             type=float,
             default=None,
@@ -707,6 +760,106 @@ def build_argument_parser(version: str = "0.0.0") -> argparse.ArgumentParser:
             action="store_true",
             default=None,
             help="Save large binary objects (e.g. firmware image) to Elasticsearch or OpenSearch",
+        )
+
+        siem_group = subp.add_argument_group("SIEM integration arguments")
+        siem_group.add_argument(
+            "--malcolm-server",
+            type=str,
+            metavar="URL",
+            default=None,
+            help="Malcolm URL. Equivalent to '-e' but auto-prepends "
+            "'/mapi/opensearch' if missing. Example: "
+            "https://user:pass@malcolm.example.com/",
+        )
+        siem_group.add_argument(
+            "--malcolm-user",
+            type=str,
+            metavar="USER",
+            default=None,
+            help="Username for Malcolm basic auth. Injected into the Malcolm URL; "
+            "falls back to --elastic-user. Prefer a config file or PEAT_ env var.",
+        )
+        siem_group.add_argument(
+            "--malcolm-password",
+            type=str,
+            metavar="PASSWORD",
+            default=None,
+            help="Password for Malcolm basic auth (with --malcolm-user). Falls back "
+            "to --elastic-password. Prefer PEAT_MALCOLM_PASSWORD or a config file.",
+        )
+        siem_group.add_argument(
+            "--so-server",
+            type=str,
+            metavar="URL",
+            default=None,
+            help="Security Onion Elasticsearch URL. Example: https://so-manager:9200/",
+        )
+        siem_group.add_argument(
+            "--so-user",
+            type=str,
+            metavar="USER",
+            default=None,
+            help="Username for Security Onion basic auth (--so-auth=basic). "
+            "Injected into the SO URL. Prefer a config file or PEAT_ env var.",
+        )
+        siem_group.add_argument(
+            "--so-password",
+            type=str,
+            metavar="PASSWORD",
+            default=None,
+            help="Password for Security Onion basic auth (with --so-user). Prefer "
+            "PEAT_SO_PASSWORD or a config file over passing this on the command line.",
+        )
+        siem_group.add_argument(
+            "--so-auth",
+            type=str,
+            choices=["none", "basic", "apikey", "cert"],
+            default=None,
+            help="Security Onion auth mode (default: basic). "
+            "'basic' uses user:pass@ in the URL; 'apikey' uses --so-api-key; "
+            "'cert' uses --so-client-cert/--so-client-key; 'none' disables auth.",
+        )
+        siem_group.add_argument(
+            "--so-api-key",
+            type=str,
+            metavar="ID:KEY",
+            default=None,
+            help="Security Onion API key in 'id:api_key' form (for --so-auth=apikey)",
+        )
+        siem_group.add_argument(
+            "--so-client-cert",
+            type=str,
+            metavar="PATH",
+            default=None,
+            help="Path to client certificate PEM for --so-auth=cert",
+        )
+        siem_group.add_argument(
+            "--so-client-key",
+            type=str,
+            metavar="PATH",
+            default=None,
+            help="Path to client key PEM for --so-auth=cert",
+        )
+        siem_group.add_argument(
+            "--so-ca-cert",
+            type=str,
+            metavar="PATH",
+            default=None,
+            help="Path to CA bundle PEM for verifying the Security Onion TLS cert",
+        )
+        siem_group.add_argument(
+            "--so-insecure",
+            action="store_true",
+            default=None,
+            help="Disable TLS verification for Security Onion (use with caution)",
+        )
+        siem_group.add_argument(
+            "--so-dataset-prefix",
+            type=str,
+            metavar="PREFIX",
+            default=None,
+            help="Prefix for event.dataset values pushed to Security Onion (default: peat)",
         )
 
     # Parse command arguments
@@ -1028,6 +1181,22 @@ def build_argument_parser(version: str = "0.0.0") -> argparse.ArgumentParser:
         'push to the device. If nothing or a "-" is '
         "specified, then stdin (piped input) is used.",
     )
+
+    # Forward command arguments
+    forward_parser.add_argument(
+        "run_dir",
+        type=validate_filepath_arg,
+        metavar="RUN_DIR",
+        help="Path to a peat_results/<run-dir>/ directory to forward",
+    )
+    forward_parser.add_argument(
+        "--target",
+        type=str,
+        choices=target_names(),
+        required=True,
+        help="SIEM target to push the run to",
+    )
+    add_list_module_args(forward_parser)  # Hack to add "--list-*" commands
 
     # Pillage Commands
     # TODO: make this positional

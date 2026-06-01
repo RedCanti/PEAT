@@ -306,6 +306,20 @@ class Configuration(SettingsManager):
     URL of the Elasticsearch server.
     """
 
+    ELASTIC_USER: str = None
+    """
+    Username for Elasticsearch basic auth. Injected into ``ELASTIC_SERVER``'s
+    userinfo at run time so credentials need not be embedded in the URL. Any
+    ``user:pass@`` already present in ``ELASTIC_SERVER`` takes precedence.
+    """
+
+    ELASTIC_PASSWORD: str = None
+    """
+    Password for Elasticsearch basic auth (paired with ``ELASTIC_USER``).
+    Keep this in a gitignored config file or a ``PEAT_ELASTIC_PASSWORD``
+    environment variable rather than on the command line.
+    """
+
     ELASTIC_SAVE_LOGS: bool = True
     """
     If PEAT logs should be sent to Elasticsearch.
@@ -459,6 +473,89 @@ class Configuration(SettingsManager):
     """
     Base name of elasticsearch index to use for :class:`peat.data.models.UEFIHash`
     """
+
+    MALCOLM_SERVER: str = None
+    """
+    URL of a Malcolm instance. The OpenSearch path (``/mapi/opensearch``) is
+    auto-appended if missing. May contain ``user:password@`` for basic auth.
+    Example: ``https://user:pass@malcolm.example.com/``.
+    """
+
+    MALCOLM_USER: str = None
+    """
+    Username for Malcolm basic auth. Injected into ``MALCOLM_SERVER``'s userinfo
+    at run time. Falls back to ``ELASTIC_USER`` when unset; any ``user:pass@``
+    already present in the URL takes precedence.
+    """
+
+    MALCOLM_PASSWORD: str = None
+    """
+    Password for Malcolm basic auth (paired with ``MALCOLM_USER``). Falls back to
+    ``ELASTIC_PASSWORD`` when unset. Keep this in a gitignored config file or a
+    ``PEAT_MALCOLM_PASSWORD`` environment variable.
+    """
+
+    SO_SERVER: str = None
+    """
+    URL of the Security Onion Elasticsearch API.
+    Example: ``https://so-manager.example.com:9200/``.
+    """
+
+    SO_USER: str = None
+    """
+    Username for Security Onion basic auth (``SO_AUTH=basic``). Injected into
+    ``SO_SERVER``'s userinfo at run time. Any ``user:pass@`` already present in
+    ``SO_SERVER`` takes precedence.
+    """
+
+    SO_PASSWORD: str = None
+    """
+    Password for Security Onion basic auth (paired with ``SO_USER``). Keep this
+    in a gitignored config file or a ``PEAT_SO_PASSWORD`` environment variable
+    rather than on the command line.
+    """
+
+    SO_AUTH: str = "basic"
+    """
+    Authentication mode for Security Onion. One of ``none``, ``basic``,
+    ``apikey``, ``cert``. ``basic`` uses ``user:pass@`` embedded in ``SO_SERVER``.
+    """
+
+    SO_API_KEY: str = None
+    """
+    Security Onion API key, formatted as ``id:api_key``. PEAT base64-encodes it
+    for the ``Authorization: ApiKey ...`` header.
+    """
+
+    SO_CLIENT_CERT: str = None
+    """
+    Path to a client certificate (PEM) for ``SO_AUTH=cert`` (mTLS).
+    """
+
+    SO_CLIENT_KEY: str = None
+    """
+    Path to the client private key (PEM) for ``SO_AUTH=cert``.
+    """
+
+    SO_CA_CERT: str = None
+    """
+    Path to a CA bundle (PEM) used to verify the Security Onion TLS certificate.
+    """
+
+    SO_INSECURE: bool = False
+    """
+    Disable TLS certificate verification when pushing to Security Onion.
+    Equivalent to the existing implicit ``verify_certs=False`` behavior, but
+    must now be opted into explicitly.
+    """
+
+    SO_DATASET_PREFIX: str = "peat"
+    """
+    Prefix used for ECS ``event.dataset`` and ``data_stream.dataset`` values
+    when enriching docs for Security Onion (e.g. ``peat.configs``,
+    ``peat.events``).
+    """
+
     HEAT_ELASTIC_SERVER: str = None
     """
     Elasticsearch server to pull :term:`HEAT` data from.
