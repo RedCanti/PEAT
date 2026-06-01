@@ -570,6 +570,18 @@ device_options:
     # output directory.
     generate_openplc_project: null
 
+  # Configuration specific to the M241 module
+  #
+  # The M241 is a CODESYS-runtime controller (EcoStruxure Machine Expert), so
+  # unlike the M340 it does not use UMAS. PEAT identifies it and pulls device
+  # identity + system metadata over the standard services it exposes.
+  m241:
+    # Which protocols to use when pulling from the device.
+    # Available methods: modbus, snmp
+    pull_methods:
+      - modbus
+      - snmp
+
   # Configuration specific to the GE modules (GERTU and GERelay)
   ge:
     # GERTU: How long to sleep between selecting menu options over
@@ -650,7 +662,7 @@ device_options:
   # File Transfer Protocol (FTP)
   #
   # "ftp" is used by the following modules:
-  #   Sage, SCEPTRE, SELRelay, M340, Micronet, Easygen3500XT
+  #   Sage, SCEPTRE, SELRelay, M340, M241, Micronet, Easygen3500XT
   ftp:
     port: 21
     timeout: 5.0
@@ -707,7 +719,7 @@ device_options:
 
   # Simple Network Management Protocol (SNMP)
   #
-  # "snmp" is used by the following modules: ControlLogix, M340, Siprotec
+  # "snmp" is used by the following modules: ControlLogix, M340, M241, Siprotec
   snmp:
     port: 161
     timeout: 5.0
@@ -726,7 +738,7 @@ device_options:
 
   # Modbus/TCP protocol
   #
-  # "modbus_tcp" is used by the following modules: M340
+  # "modbus_tcp" is used by the following modules: M340, M241
   modbus_tcp:
     port: 502
     timeout: 5.0

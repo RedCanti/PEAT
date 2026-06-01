@@ -42,6 +42,9 @@ peat scan -b 192.0.2.0/24
 # Search for M340 and ControlLogix devices
 peat scan -d m340 controllogix -i 192.0.2.0/24
 
+# Search for Schneider M241 controllers on a subnet
+peat scan -d m241 -i 192.0.2.0/24
+
 # Search for PLCs
 peat scan -d plc -i 192.0.2.0/24
 
@@ -179,6 +182,9 @@ peat pull -d rtu -i 192.0.2.0/24
 
 # Pull from a single M340 PLC, with a 1-second timeout
 peat pull -d m340 -i 192.0.2.41 -T 1.0
+
+# Pull device identity and SNMP system info from a Schneider M241 controller
+peat pull -d m241 -i 192.0.2.42
 
 # Pull from any M340 and ControlLogix PLCs with
 # IPs in the range from 192.0.2.1 and 192.0.2.5

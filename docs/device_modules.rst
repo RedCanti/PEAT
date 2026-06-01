@@ -137,6 +137,17 @@ UMAS protocol
 .. automodule:: peat.modules.schneider.m340.umas_codes
    :members:
 
+Modicon M241 logic controller
+-----------------------------
+.. automodule:: peat.modules.schneider.m241.m241
+   :members:
+   :no-undoc-members:
+
+M241 Modbus device identification
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. automodule:: peat.modules.schneider.m241.m241_modbus
+   :members:
+
 .. ION power meter
 .. ---------------
 .. .. automodule:: peat.modules.schneider.ion.ion
