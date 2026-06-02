@@ -105,6 +105,10 @@ peat scan --sweep -i 192.0.2.0/24
 # Upload results to an Elasticsearch server listening on localhost
 peat scan -d selrelay -i 192.0.2.0/24 -e
 
+# Push scan results live to a Security Onion deployment (ECS-enriched).
+# '--so-server' is the Security Onion counterpart to '-e' and takes precedence over it.
+peat scan -d selrelay -i 192.0.2.0/24 --so-server https://so-manager:9200
+
 # Send results to a Malcolm instance running on localhost
 # Malcolm uses OpenSearch instead of Elasticsearch
 peat scan -d selrelay -i 192.0.2.0/24 -e https://user:pass@localhost/mapi/opensearch
@@ -194,6 +198,12 @@ peat pull -q --print-results -d m340 -i 192.0.2.1
 
 # Pull from all M340 PLCs and upload results to a local Elasticsearch server
 peat pull -d m340 -i 192.0.2.0/24 -e
+
+# Push pull results live to a Security Onion deployment (with ECS enrichment).
+# '--so-server' is the Security Onion counterpart to '-e'; with no URL it defaults
+# to https://localhost:9200/. Credentials are best set via a config file or
+# PEAT_SO_* env vars rather than embedded in the URL.
+peat pull -d m340 -i 192.0.2.0/24 --so-server https://so-manager:9200 --so-ca-cert /etc/so/ca.pem
 
 # Send results to a Malcolm instance running on localhost
 # Malcolm uses OpenSearch instead of Elasticsearch
@@ -793,7 +803,13 @@ def build_argument_parser(version: str = "0.0.0") -> argparse.ArgumentParser:
             type=str,
             metavar="URL",
             default=None,
-            help="Security Onion Elasticsearch URL. Example: https://so-manager:9200/",
+            nargs="?",
+            const="https://localhost:9200/",
+            help="Push results to Security Onion's Elasticsearch API, with ECS "
+            "enrichment so the data surfaces in Hunt/Dashboards. The Security "
+            "Onion counterpart to '-e'; takes precedence over it when both are "
+            "given. With no argument, defaults to https://localhost:9200/. "
+            "Example: https://so-manager:9200/",
         )
         siem_group.add_argument(
             "--so-user",

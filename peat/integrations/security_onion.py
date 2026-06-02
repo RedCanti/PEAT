@@ -199,14 +199,37 @@ class SecurityOnion(Elastic):
 
     def gen_body(self, content: dict) -> dict[str, Any]:
         body = super().gen_body(content)
-        # gen_body is called before bulk_push knows the dated index name, so the
-        # dataset is derived from a hint placed on the content (or omitted).
-        # The forwarder uses ``enrich(...)`` directly when replaying with a known index.
+        # gen_body doesn't receive the index name, so the dataset is derived from
+        # a hint placed on the content by push()/bulk_push() (or omitted). The
+        # forwarder uses ``enrich(...)`` directly when replaying with a known index.
         index_hint = content.get("_so_index_hint")
         if index_hint:
             self.enrich(body, index_hint)
             body.pop("_so_index_hint", None)
         return body
+
+    # ------------------------------------------------------------------
+    # In-band push (live scan/pull/parse collection)
+    # ------------------------------------------------------------------
+    #
+    # The live collection path pushes one doc at a time via push() or in
+    # batches via bulk_push(). Both run gen_body(), which can only enrich when
+    # the target index is known. The index *is* known here, so stash it as a
+    # hint on the content for gen_body() to consume. (The offline forwarder
+    # uses bulk_push_raw(), which enriches directly and needs no hint.)
+
+    def push(
+        self,
+        index: str,
+        content: dict,
+        doc_id: str | None = None,
+        no_date: bool = False,
+    ) -> bool:
+        return super().push(index, {**content, "_so_index_hint": index}, doc_id, no_date)
+
+    def bulk_push(self, index: str, contents: list[tuple[str, dict]]) -> bool:
+        hinted = [(doc_id, {**content, "_so_index_hint": index}) for doc_id, content in contents]
+        return super().bulk_push(index, hinted)
 
     # ------------------------------------------------------------------
     # Bulk push

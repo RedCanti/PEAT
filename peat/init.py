@@ -5,7 +5,6 @@ from pprint import pformat
 
 from peat import (
     DeviceData,
-    Elastic,
     PeatError,
     config,
     config_crypto,
@@ -21,6 +20,34 @@ from peat import (
 from peat.data.default_options import DEFAULT_OPTIONS
 
 from .log_utils import print_logo, setup_logging
+
+
+def _select_upload_target(
+    candidates: tuple[tuple[str, str, str | None], ...],
+    cli_args: dict,
+) -> tuple[str | None, str | None]:
+    """
+    Pick the live upload target ``(name, server_url)``, or ``(None, None)``.
+
+    A target named explicitly on the command line (its ``arg_key`` is truthy in
+    ``cli_args``) wins over one that only appears in a loaded config file, so an
+    explicit ``--malcolm-server`` overrides a ``so_server`` sitting in the
+    config. Within each source the order is the order of ``candidates``
+    (Security Onion > Malcolm > Elastic).
+
+    Args:
+        candidates: Ordered ``(name, arg_key, server_url)`` tuples, highest
+            precedence first.
+        cli_args: The raw CLI arguments dict (``conf``), used to tell which
+            targets were named on the command line versus only in config.
+    """
+    # First pass: only targets named on the CLI. Second pass: any source.
+    for cli_only in (True, False):
+        for name, arg_key, server in candidates:
+            if not server or (cli_only and not cli_args.get(arg_key)):
+                continue
+            return name, server
+    return None, None
 
 
 def initialize_peat(conf: dict, entrypoint: consts.EntrypointType = "Package") -> None:
@@ -285,23 +312,37 @@ def initialize_peat(conf: dict, entrypoint: consts.EntrypointType = "Package") -
 
         exit_handler.register(_save_on_exit, "FILE")
 
-    # Configure Elasticsearch. If a server is specified,
-    # create an Elastic instance and attempt to connect.
-    # If elastic server in conf, and elastic already initialized,
-    # only reconnect if the server URL is different.
-    if (config.ELASTIC_SERVER and not state.elastic) or (
-        conf.get("elastic_server")
-        and state.elastic
-        and conf["elastic_server"] not in state.elastic.unsafe_url
+    # Choose the live upload target. A target named explicitly on the command
+    # line wins over one that only appears in a loaded config file (CLI intent
+    # beats config), so e.g. "--malcolm-server ..." overrides a "so_server"
+    # sitting in the config file. Within each source the order is Security
+    # Onion > Malcolm > Elastic. If none is set, no upload target is created
+    # and collected data is only written to files.
+    target_name, target_url = _select_upload_target(
+        (
+            ("security_onion", "so_server", config.SO_SERVER),
+            ("malcolm", "malcolm_server", config.MALCOLM_SERVER),
+            ("elastic", "elastic_server", config.ELASTIC_SERVER),
+        ),
+        conf,
+    )
+
+    # Build a new instance if a target is configured and either none exists yet
+    # or the configured server differs from the one already connected (lets the
+    # REPL/Package entrypoint reconnect to a different server between calls).
+    if target_name and (
+        not state.elastic or target_url not in state.elastic.unsafe_url
     ):
+        from peat.integrations import build_target
+
         try:
-            # NOTE: don't log ELASTIC_SERVER value as it may have sensitive login creds
-            log.trace2("Setting up global Elastic instance...")
-            elastic = Elastic(config.ELASTIC_SERVER)
-            elastic.ping()  # Force the connection to be created
+            # NOTE: don't log the URL, it may carry sensitive login credentials
+            log.trace2(f"Setting up global {target_name} upload instance...")
+            instance = build_target(target_name)
+            instance.ping()  # Force the connection to be created
         except Exception as ex:
             log.error(
-                f"Failed to initialize Elasticsearch/OpenSearch. Data "
+                f"Failed to initialize the {target_name} upload target. Data "
                 f"from this run will not be pushed to the database. "
                 f"Exception: {ex}"
             )
@@ -315,7 +356,7 @@ def initialize_peat(conf: dict, entrypoint: consts.EntrypointType = "Package") -
             if state.elastic:
                 state.elastic.disconnect()
 
-            state.elastic = elastic  # Set the global Elastic instance
+            state.elastic = instance  # Set the global upload instance
 
     # Record the fact that timezone data may be wonky
     try:

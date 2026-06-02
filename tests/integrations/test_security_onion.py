@@ -5,6 +5,7 @@ These cover ECS enrichment and dataset mapping without contacting a live
 Security Onion deployment.
 """
 
+from peat.elastic import Elastic
 from peat.integrations import SecurityOnion
 
 
@@ -51,3 +52,61 @@ def test_enrich_uses_configured_prefix():
     enriched = so.enrich({}, "peat-configs")
     assert enriched["event"]["dataset"] == "ot-team.configs"
     assert enriched["data_stream"]["dataset"] == "ot-team.configs"
+
+
+# --- in-band (live collection) enrichment via the _so_index_hint -------------
+
+
+def test_gen_body_enriches_from_index_hint():
+    so = SecurityOnion("https://so.example.com/")
+    body = so.gen_body({"_so_index_hint": "ot-device-registers", "foo": "bar"})
+
+    assert body["event"]["dataset"] == "peat.registers"
+    assert body["data_stream"]["dataset"] == "peat.registers"
+    assert body["foo"] == "bar"
+    # The hint is an internal marker and must not leak into the stored doc
+    assert "_so_index_hint" not in body
+
+
+def test_gen_body_without_hint_is_not_enriched():
+    so = SecurityOnion("https://so.example.com/")
+    body = so.gen_body({"foo": "bar"})
+    assert body.get("event", {}).get("dataset") is None
+
+
+def test_push_injects_index_hint(monkeypatch):
+    so = SecurityOnion("https://so.example.com/")
+    captured = {}
+
+    def fake_push(self, index, content, doc_id=None, no_date=False):
+        captured["index"] = index
+        captured["content"] = content
+        return True
+
+    monkeypatch.setattr(Elastic, "push", fake_push)
+    original = {"foo": "bar"}
+
+    assert so.push("ot-device-registers", original) is True
+    assert captured["index"] == "ot-device-registers"
+    assert captured["content"]["_so_index_hint"] == "ot-device-registers"
+    # The caller's dict must not be mutated
+    assert "_so_index_hint" not in original
+
+
+def test_bulk_push_injects_index_hint(monkeypatch):
+    so = SecurityOnion("https://so.example.com/")
+    captured = {}
+
+    def fake_bulk_push(self, index, contents):
+        captured["index"] = index
+        captured["contents"] = contents
+        return True
+
+    monkeypatch.setattr(Elastic, "bulk_push", fake_bulk_push)
+    original = {"foo": "bar"}
+
+    assert so.bulk_push("ot-device-tags", [("id1", original)]) is True
+    assert captured["index"] == "ot-device-tags"
+    assert captured["contents"][0][1]["_so_index_hint"] == "ot-device-tags"
+    # The caller's dict must not be mutated
+    assert "_so_index_hint" not in original
