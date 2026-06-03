@@ -774,6 +774,17 @@ def build_argument_parser(version: str = "0.0.0") -> argparse.ArgumentParser:
 
         siem_group = subp.add_argument_group("SIEM integration arguments")
         siem_group.add_argument(
+            "--integration",
+            type=str,
+            metavar="NAME",
+            default=None,
+            help="Select a named SIEM integration profile from the "
+            "'integrations' config section, or a bare target type "
+            "(security_onion, malcolm, or elastic). Applies that profile's "
+            "connection settings and auto-selects it as the upload target for "
+            "live scan/pull/parse runs, overriding the flat '*-server' options.",
+        )
+        siem_group.add_argument(
             "--malcolm-server",
             type=str,
             metavar="URL",

@@ -352,6 +352,33 @@ so_dataset_prefix: "peat"
 
 # -----------------------------------------------------------------------------
 
+# --- Named SIEM integration profiles ---
+# Define one or more named targets here, then select one on a live run with
+# "--integration <name>". Each profile's "type" is a registered target
+# (security_onion, malcolm, or elastic) plus that type's connection settings
+# (server, user, password, and type-specific fields like auth/insecure/ca_cert).
+# This lets several targets -- even multiple of the same type -- coexist and be
+# chosen by name, instead of juggling the flat *_server options above.
+# Keep real credentials in a gitignored file (see peat-credentials.example.yaml).
+#
+# Example:
+#   integrations:
+#     job:
+#       type: malcolm
+#       server: "https://malcolm.example.com/"
+#       user: analyst
+#       password: changeme
+#     soc-prod:
+#       type: security_onion
+#       server: "https://so-manager:9200/"
+#       auth: basic
+#       user: peat
+#       password: changeme
+#       insecure: true
+integrations: {}
+
+# -----------------------------------------------------------------------------
+
 # --- HEAT (High-fidelity Extraction of Artifacts from Traffic) ---
 # Refer to the HEAT section in the PEAT documentation for details.
 # https://sandialabs.github.io/PEAT/operate.html

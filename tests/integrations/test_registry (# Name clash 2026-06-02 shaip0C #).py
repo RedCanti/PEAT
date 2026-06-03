@@ -174,7 +174,8 @@ def test_resolve_security_onion_profile_includes_type_specific_fields():
         "so_password": "secret",
         "so_insecure": True,
     }
-    assert "so_type" not in overrides  # "type" itself is never mapped
+    # "type" itself is never mapped onto a setting
+    assert "so_type" not in overrides
 
 
 def test_resolve_bare_type_has_no_overrides():

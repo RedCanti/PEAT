@@ -13,7 +13,7 @@ that differs between targets lives here.
 
 from .forwarder import forward_run, iter_run_docs
 from .malcolm import Malcolm
-from .registry import build_target, target_names
+from .registry import build_target, resolve_integration, target_names
 from .security_onion import SecurityOnion
 
 __all__ = [
@@ -22,5 +22,6 @@ __all__ = [
     "build_target",
     "forward_run",
     "iter_run_docs",
+    "resolve_integration",
     "target_names",
 ]

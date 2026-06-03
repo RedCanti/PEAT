@@ -80,6 +80,43 @@ environment variable (e.g. ``PEAT_SO_PASSWORD``) > config file value. Avoid
 passing real passwords as CLI flags on shared hosts, where they are visible in
 the process list and shell history.
 
+Named integration profiles
+===========================
+
+The flat ``*_server`` settings describe at most one target of each type. To
+define several targets at once -- including multiple of the *same* type, e.g.
+two Malcolms with different credentials -- use the ``integrations`` config
+section and select one by name on a live run with ``--integration <name>``.
+
+.. code-block:: yaml
+
+    integrations:
+      job:
+        type: malcolm
+        server: "https://1.1.1.1/"
+        user: Greg
+        password: Gregpass
+      soc-prod:
+        type: security_onion
+        server: "https://so-manager:9200/"
+        auth: basic
+        user: peat
+        password: !ENV SO_PASSWORD
+        insecure: true
+
+::
+
+    peat pull -d selrelay -i 192.0.2.10 --integration job -c peat-credentials.yaml
+
+Each profile's ``type`` is a registered target (``security_onion``,
+``malcolm``, ``elastic``). Its remaining fields map onto that type's settings --
+``server`` → ``*_server``, ``user`` → ``*_user``, ``insecure`` → ``so_insecure``,
+and so on -- so any option the flat settings accept works inside a profile too.
+
+``--integration`` also accepts a bare target *type* (``--integration malcolm``),
+which selects that type using the flat ``*_server`` settings. It takes
+precedence over the flat ``--*-server`` flags and the config-file defaults.
+
 Malcolm
 =======
 

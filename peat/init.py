@@ -312,20 +312,44 @@ def initialize_peat(conf: dict, entrypoint: consts.EntrypointType = "Package") -
 
         exit_handler.register(_save_on_exit, "FILE")
 
-    # Choose the live upload target. A target named explicitly on the command
-    # line wins over one that only appears in a loaded config file (CLI intent
-    # beats config), so e.g. "--malcolm-server ..." overrides a "so_server"
-    # sitting in the config file. Within each source the order is Security
-    # Onion > Malcolm > Elastic. If none is set, no upload target is created
-    # and collected data is only written to files.
-    target_name, target_url = _select_upload_target(
-        (
-            ("security_onion", "so_server", config.SO_SERVER),
-            ("malcolm", "malcolm_server", config.MALCOLM_SERVER),
-            ("elastic", "elastic_server", config.ELASTIC_SERVER),
-        ),
-        conf,
-    )
+    # Choose the live upload target. An explicit "--integration <name>" wins
+    # over everything: it selects a named profile from the "integrations" config
+    # (or a bare target type) and applies that profile's connection settings.
+    # Otherwise, a target named on the command line wins over one that only
+    # appears in a loaded config file (CLI intent beats config), so e.g.
+    # "--malcolm-server ..." overrides a "so_server" sitting in the config file.
+    # Within each source the order is Security Onion > Malcolm > Elastic. If none
+    # is set, no upload target is created and data is only written to files.
+    _server_attr = {
+        "security_onion": "SO_SERVER",
+        "malcolm": "MALCOLM_SERVER",
+        "elastic": "ELASTIC_SERVER",
+    }
+    target_name = target_url = None
+    if conf.get("integration"):
+        from peat.integrations import resolve_integration
+
+        try:
+            target_name, overrides = resolve_integration(
+                conf["integration"], config.INTEGRATIONS or {}
+            )
+            if overrides:
+                # Fold the profile's fields onto the flat target settings so the
+                # existing builders consume them unchanged.
+                config.load_from_dict(overrides)
+            target_url = getattr(config, _server_attr[target_name])
+        except PeatError as ex:
+            log.error(f"--integration: {ex}. Data will not be pushed to a SIEM.")
+            target_name = target_url = None
+    else:
+        target_name, target_url = _select_upload_target(
+            (
+                ("security_onion", "so_server", config.SO_SERVER),
+                ("malcolm", "malcolm_server", config.MALCOLM_SERVER),
+                ("elastic", "elastic_server", config.ELASTIC_SERVER),
+            ),
+            conf,
+        )
 
     # Build a new instance if a target is configured and either none exists yet
     # or the configured server differs from the one already connected (lets the

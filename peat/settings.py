@@ -556,6 +556,31 @@ class Configuration(SettingsManager):
     ``peat.events``).
     """
 
+    INTEGRATIONS: dict = {}
+    """
+    Named SIEM integration profiles, selectable on a live run with
+    ``--integration <name>``. Each entry maps a profile name to a connection
+    config whose ``type`` is one of the registered targets (``security_onion``,
+    ``malcolm``, ``elastic``) plus that type's settings (``server``, ``user``,
+    ``password``, and any type-specific fields such as ``auth``/``insecure``).
+    Lets several targets -- even multiple of the same type -- be defined at once
+    and chosen by name, instead of juggling the flat ``*_server`` settings. Example::
+
+        integrations:
+          job:
+            type: malcolm
+            server: "https://1.1.1.1/"
+            user: Greg
+            password: Gregpass
+          soc-prod:
+            type: security_onion
+            server: "https://so-manager:9200/"
+            auth: basic
+            user: peat
+            password: !ENV SO_PASSWORD
+            insecure: true
+    """
+
     HEAT_ELASTIC_SERVER: str = None
     """
     Elasticsearch server to pull :term:`HEAT` data from.

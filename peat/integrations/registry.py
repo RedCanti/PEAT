@@ -84,4 +84,69 @@ def build_elastic(server_url: str | None = None) -> Elastic:
     return Elastic(url)
 
 
-__all__ = ["build_elastic", "build_target", "target_names"]
+# Flat-settings prefix for each target type. A profile's generic fields
+# (``server``, ``user``, ``insecure``, ...) map onto ``<PREFIX>_<FIELD>``
+# settings (``SO_SERVER``, ``MALCOLM_USER``, ...) which the builders already read.
+_TYPE_PREFIX: dict[str, str] = {
+    "security_onion": "so",
+    "malcolm": "malcolm",
+    "elastic": "elastic",
+}
+
+
+def resolve_integration(
+    name: str, integrations: dict | None = None
+) -> tuple[str, dict[str, object]]:
+    """
+    Resolve a ``--integration`` value to a target type and config overrides.
+
+    ``name`` may be either a profile name defined under the ``integrations``
+    config section, or a bare target type (see :func:`target_names`). For a
+    profile, its fields (minus ``type``) are mapped to flat ``<prefix>_<field>``
+    settings so the existing target builders can consume them unchanged.
+
+    Args:
+        name: A profile name or a bare target type.
+        integrations: The ``integrations`` config mapping (``config.INTEGRATIONS``).
+
+    Returns:
+        ``(target_type, overrides)`` -- ``overrides`` is a dict of flat settings
+        to apply before building (e.g. ``{"so_server": ..., "so_user": ...}``),
+        empty for a bare type.
+
+    Raises:
+        PeatError: If ``name`` is neither a known profile nor a target type, or
+            a profile is malformed (not a mapping, or missing/unknown ``type``).
+    """
+    integrations = integrations or {}
+
+    if name in integrations:
+        profile = integrations[name]
+        if not isinstance(profile, dict):
+            raise PeatError(
+                f"Integration profile {name!r} must be a mapping, "
+                f"got {type(profile).__name__}"
+            )
+        target_type = profile.get("type")
+        if target_type not in _TYPE_PREFIX:
+            raise PeatError(
+                f"Integration profile {name!r} has missing/unknown type "
+                f"{target_type!r}. Valid types: {', '.join(sorted(_TYPE_PREFIX))}"
+            )
+        prefix = _TYPE_PREFIX[target_type]
+        overrides = {
+            f"{prefix}_{key}": value for key, value in profile.items() if key != "type"
+        }
+        return target_type, overrides
+
+    if name in _TYPE_PREFIX:
+        return name, {}
+
+    raise PeatError(
+        f"Unknown integration {name!r}. Defined profiles: "
+        f"{', '.join(sorted(integrations)) or '(none)'}; "
+        f"target types: {', '.join(sorted(_TYPE_PREFIX))}"
+    )
+
+
+__all__ = ["build_elastic", "build_target", "resolve_integration", "target_names"]

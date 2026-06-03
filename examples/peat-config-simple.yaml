@@ -82,6 +82,8 @@ so_ca_cert: null
 so_insecure: false
 so_dataset_prefix: "peat"
 
+integrations: {}
+
 heat_elastic_server: null
 heat_index_names: "packetbeat-*"
 heat_date_range: null
