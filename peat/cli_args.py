@@ -602,6 +602,20 @@ def build_argument_parser(version: str = "0.0.0") -> argparse.ArgumentParser:
             help="Load PEAT configuration from a file (YAML or JSON)",
         )
         group.add_argument(
+            "--credentials-file",
+            "--creds-file",
+            type=str,
+            metavar="FILE",
+            default=None,
+            help="Load credentials/secrets (SIEM integration profiles, "
+            "user/password settings, etc.) from a SEPARATE YAML or JSON file. "
+            "Loaded after --config-file and layered on top, so its values "
+            "override the main config for overlapping keys; this lets a "
+            "shareable config and your secrets live apart. Unlike --config-file, "
+            "it is NOT copied into the run's metadata directory. CLI flags and "
+            "PEAT_ environment variables still take precedence.",
+        )
+        group.add_argument(
             "-I",
             "--import-modules",
             type=str,

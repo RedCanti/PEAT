@@ -75,10 +75,20 @@ variable at load time instead of storing it on disk:
     so_user: "so_elastic"
     so_password: !ENV "SO_PASSWORD"   # read from $SO_PASSWORD at load time
 
+Both ``-c``/``--config-file`` and a dedicated ``--credentials-file`` (alias
+``--creds-file``) can be given on the same run. The credentials file is loaded
+after ``-c`` and layered on top, so its values win over the main config for
+overlapping keys, and -- unlike ``-c`` -- it is never copied into the run's
+metadata directory. This lets a shareable (committable) config and the secrets
+it needs live in separate files::
+
+    peat -c peat-config.yaml --credentials-file peat-credentials.yaml \
+        scan 192.0.2.0/24 --integration soc-prod
+
 Precedence, highest first: CLI flag (e.g. ``--so-password``) > ``PEAT_*``
-environment variable (e.g. ``PEAT_SO_PASSWORD``) > config file value. Avoid
-passing real passwords as CLI flags on shared hosts, where they are visible in
-the process list and shell history.
+environment variable (e.g. ``PEAT_SO_PASSWORD``) > ``--credentials-file`` value
+> ``--config-file`` value. Avoid passing real passwords as CLI flags on shared
+hosts, where they are visible in the process list and shell history.
 
 Named integration profiles
 ===========================

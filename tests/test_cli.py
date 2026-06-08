@@ -459,3 +459,52 @@ def test_cli_config_file_json(run_peat, tmp_path, datapath):
     written_files = sorted(state_data["written_files"])
     actual_files = sorted([x.as_posix() for x in tmp_path.rglob("*.*")])
     assert written_files == actual_files
+
+
+def test_cli_credentials_file(run_peat, tmp_path, examples_path):
+    """
+    --credentials-file loads alongside --config-file and is logged, and the
+    credentials file is NOT copied into the run's metadata directory (whereas
+    the main config file is), keeping secrets out of run output.
+    """
+    out_dir = tmp_path / "out"
+    creds = tmp_path / "secrets" / "creds.yaml"
+    creds.parent.mkdir(parents=True)
+    creds.write_text("elastic_save_blobs: true\n", encoding="utf-8")
+
+    args = [
+        "scan",
+        "--print-results",
+        "-vVV",
+        "-T",
+        "0.01",
+        "-d",
+        "clx",
+        "-i",
+        "localhost",
+        "--config-file",
+        examples_path("peat-config.yaml").as_posix(),
+        "--credentials-file",
+        creds.as_posix(),
+        "--out-dir",
+        out_dir.as_posix(),
+    ]
+
+    stdout, stderr = run_peat(args)
+
+    assert stdout
+    assert "hosts_verified" in json.loads(stdout)
+    assert "CRITICAL" not in stderr
+    # Both files are loaded and surfaced to the user.
+    assert "peat-config.yaml" in stderr
+    assert "Credentials loaded from" in stderr
+    assert "creds.yaml" in stderr
+
+    # Locate the run directory and its metadata folder.
+    run_dir = next(p for p in out_dir.iterdir() if p.is_dir())
+    meta_files = [p.name for p in (run_dir / "peat_metadata").iterdir()]
+
+    # The main config IS copied into run metadata for reproducibility...
+    assert "peat-config.yaml" in meta_files
+    # ...but the credentials file is NEVER copied anywhere into run output.
+    assert not list(out_dir.rglob("creds.yaml"))

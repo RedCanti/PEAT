@@ -50,6 +50,39 @@ def _select_upload_target(
     return None, None
 
 
+def _load_config_file(path_str: str) -> None:
+    """
+    Load a PEAT config or credentials file into the file-config layer.
+
+    Handles plain YAML/JSON files as well as encrypted configs. Calling this for
+    more than one file (e.g. ``--config-file`` then ``--credentials-file``)
+    overlays each successive file on top of the previous one: they all populate
+    the same ``file_configs`` layer, where a later write wins per key.
+
+    Args:
+        path_str: Path to the configuration/credentials file to load.
+    """
+    config_path = Path(path_str).resolve()
+    try:
+        config.load_from_file(config_path)
+    except AttributeError:
+        # This is likely an encrypted config, check to see if it is and unencrypt
+        # need to decrypt file then load yaml (safe_load) or json (load)
+        decrypted_str = config_crypto.decrypt_config(config_path)
+        if decrypted_str:
+            decrypted_dict = config_crypto.convert_to_dict(decrypted_str)
+            if decrypted_dict:
+                config._load_values(decrypted_dict, load_to="file_configs")
+        else:
+            # If above failed, there is likely a problem with the config file
+            log.error(
+                "PEAT encountered an error while attempting to read config file, "
+                "check to ensure your config file is formatted correctly "
+                "and the filepath is valid"
+            )
+            sys.exit(1)
+
+
 def initialize_peat(conf: dict, entrypoint: consts.EntrypointType = "Package") -> None:
     """
     Various initialization steps for most PEAT use cases.
@@ -82,28 +115,17 @@ def initialize_peat(conf: dict, entrypoint: consts.EntrypointType = "Package") -
     ):
         conf["out_dir"] = None
 
-    # If config file is specified, load those values
+    # Load settings from a config file (if given), then overlay a separate
+    # credentials/secrets file (if given). Both populate the file-config layer;
+    # the credentials file is loaded SECOND so its values take precedence over
+    # the main config for overlapping keys. CLI flags and PEAT_* env vars still
+    # win over both. This lets a shareable config and sensitive credentials live
+    # in separate files.
     # NOTE: non-None values in 'conf' will override any file values!
-    try:
-        if conf.get("config_file"):
-            config_path = Path(conf["config_file"]).resolve()
-            config.load_from_file(config_path)
-    except AttributeError:
-        # This is likely an encrypted config, check to see if it is and unencrypt
-        # need to decrypt file then load yaml (safe_load) or json (load)
-        decrypted_str = config_crypto.decrypt_config(config_path)
-        if decrypted_str:
-            decrypted_dict = config_crypto.convert_to_dict(decrypted_str)
-            if decrypted_dict:
-                config._load_values(decrypted_dict, load_to="file_configs")
-        else:
-            # If above failed, there is likely a problem with the config file
-            log.error(
-                "PEAT encountered an error while attempting to read config file, "
-                "check to ensure your config file is formatted correctly "
-                "and the filepath is valid"
-            )
-            sys.exit(1)
+    if conf.get("config_file"):
+        _load_config_file(conf["config_file"])
+    if conf.get("credentials_file"):
+        _load_config_file(conf["credentials_file"])
 
     # Load runtime configurations (CLI arguments, program-specified, etc.)
     # This magically populates Configuration options from same-named CLI arguments
@@ -195,7 +217,9 @@ def initialize_peat(conf: dict, entrypoint: consts.EntrypointType = "Package") -
         debug_info_file=debug_info_file,
     )
 
-    # Copy original config file
+    # Copy original config file into the run metadata for reproducibility.
+    # NOTE: a --credentials-file is intentionally NOT copied here -- it holds
+    # secrets that must never be written into the run output directory.
     if conf.get("config_file") and config.META_DIR:
         config_path = Path(conf["config_file"]).resolve()
         utils.copy_file(config_path, config.META_DIR / config_path.name)
@@ -206,6 +230,8 @@ def initialize_peat(conf: dict, entrypoint: consts.EntrypointType = "Package") -
         config_name = f"'{config.METADATA['name']}' "
     if conf.get("config_file"):  # Log so the user sees config was loaded
         log.info(f"Configuration {config_name}loaded from '{conf['config_file']}'")
+    if conf.get("credentials_file"):  # Log the path only -- never the contents
+        log.info(f"Credentials loaded from '{conf['credentials_file']}'")
 
     if config.RUN_DIR:
         log.info(f"Run directory: {config.RUN_DIR.name}")
@@ -354,9 +380,7 @@ def initialize_peat(conf: dict, entrypoint: consts.EntrypointType = "Package") -
     # Build a new instance if a target is configured and either none exists yet
     # or the configured server differs from the one already connected (lets the
     # REPL/Package entrypoint reconnect to a different server between calls).
-    if target_name and (
-        not state.elastic or target_url not in state.elastic.unsafe_url
-    ):
+    if target_name and (not state.elastic or target_url not in state.elastic.unsafe_url):
         from peat.integrations import build_target
 
         try:

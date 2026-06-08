@@ -52,6 +52,27 @@ def test_load_from_file(settings_instance, datapath, file_ext):
     }
 
 
+def test_load_from_file_overlay(settings_instance, tmp_path):
+    """
+    A second loaded file overlays the first: this is the mechanism behind
+    ``--credentials-file`` layering on top of ``--config-file``. Both populate
+    the file-config layer, where a later write wins per key, and keys absent
+    from the second file are preserved from the first.
+    """
+    base = tmp_path / "config.yaml"
+    base.write_text("test_option: from_config\nalpha: true\n", encoding="utf-8")
+    creds = tmp_path / "creds.yaml"
+    creds.write_text("test_option: from_creds\n", encoding="utf-8")
+
+    assert settings_instance.load_from_file(base)
+    assert settings_instance.load_from_file(creds)
+
+    # Overlapping key -> the later (credentials) file wins.
+    assert settings_instance.TEST_OPTION == "from_creds"
+    # Key only in the first (config) file is preserved.
+    assert settings_instance.ALPHA is True
+
+
 def test_save_to_file(settings_instance, tmp_path, assert_glob_path):
     settings_instance.save_to_file(outdir=tmp_path)
 
